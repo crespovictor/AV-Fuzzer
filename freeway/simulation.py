@@ -12,14 +12,17 @@ import liability
 from datetime import datetime
 import util
 import copy
+from environs import Env
 
+env  = Env()
      
+
 class LgApSimulation:
 
     def __init__(self):
         ################################################################
         self.totalSimTime = 15
-        self.bridgeLogPath = "/home/av-input/Workplace/apollo-lg/apollo-3.5/data/log/cyber_bridge.INFO"
+        self.bridgeLogPath = "/home/victor/Desktop/apollo-lg/apollo-5.0/data/log/cyber_bridge.INFO"
         ################################################################
         self.sim = None 
         self.ego = None # There is only one ego
@@ -38,7 +41,7 @@ class LgApSimulation:
         sim = lgsvl.Simulator(os.environ.get("SIMULATOR_HOST", "127.0.0.1"), 8181) 
         self.sim = sim
 
-    def loadMap(self, mapName="SanFrancisco"):
+    def loadMap(self, mapName=lgsvl.wise.DefaultAssets.map_sanfrancisco):
         sim = self.sim
         if sim.current_scene == mapName:
            sim.reset()
@@ -49,7 +52,7 @@ class LgApSimulation:
         sim = self.sim
         egoState = lgsvl.AgentState()
         egoState.transform = sim.map_point_on_lane(self.initEvPos)
-        ego = sim.add_agent("XE_Rigged-apollo_3_5", lgsvl.AgentType.EGO, egoState)
+        ego = sim.add_agent(lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5, lgsvl.AgentType.EGO, egoState)
         sensors = ego.get_sensors()
         for s in sensors:
             if s.name in ['velodyne', 'Main Camera', 'Telephoto Camera', 'GPS', 'IMU']:
@@ -59,7 +62,7 @@ class LgApSimulation:
     def connectEvToApollo(self):
         ego = self.ego
         print("Connecting to bridge")
-        ego.connect_bridge(os.environ.get("BRIDGE_HOST", "127.0.0.1"), 9090)
+        ego.connect_bridge(env.str("LGSVL__AUTOPILOT_0_HOST", lgsvl.wise.SimulatorSettings.bridge_host), env.int("LGSVL__AUTOPILOT_0_PORT", lgsvl.wise.SimulatorSettings.bridge_port))
         while not ego.bridge_connected:
             time.sleep(1)
         print("Bridge connected")

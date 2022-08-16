@@ -12,18 +12,24 @@ import liability
 from datetime import datetime
 import util
 import copy
+from environs import Env
+
+env  = Env()
 
      
 class LgApSimulation:
 
     def __init__(self):
         ################################################################
+        print("Starting LgApSimulation")
         self.totalSimTime = 15
-        self.bridgeLogPath = "/home/av-input/Workplace/apollo-lg/apollo-3.5/data/log/cyber_bridge.INFO"
+        self.bridgeLogPath = "/home/victor/Desktop/apollo-lg/apollo-5.0/data/log/cyber_bridge.INFO"
         ################################################################
+        print(self.totalSimTime)
         self.sim = None 
         self.ego = None # There is only one ego
-        self.initEvPos = lgsvl.Vector(190, 10, 4.1)
+        #self.initEvPos = lgsvl.Vector(190, 10, 4.1)
+        self.initEvPos = lgsvl.Vector(-50, 10, -9)
         self.npcList = [] # The list contains all the npc added
         self.initSimulator()
         self.loadMap()
@@ -35,31 +41,34 @@ class LgApSimulation:
         self.egoFaultDeltaD = 0
 
     def initSimulator(self):
-        sim = lgsvl.Simulator(os.environ.get("SIMULATOR_HOST", "127.0.0.1"), 8181) 
+        sim = lgsvl.Simulator(env.str("LGSVL__SIMULATOR_HOST", lgsvl.wise.SimulatorSettings.simulator_host), env.int("LGSVL__SIMULATOR_PORT", lgsvl.wise.SimulatorSettings.simulator_port)) 
         self.sim = sim
+        print("Sim object created")
 
-    def loadMap(self, mapName="SanFrancisco"):
+    def loadMap(self, mapName=lgsvl.wise.DefaultAssets.map_borregasave): #mapName="SanFrancisco"
         sim = self.sim
         if sim.current_scene == mapName:
            sim.reset()
         else:
            sim.load(mapName)
+        print("Map loaded")
 
     def initEV(self):
         sim = self.sim
         egoState = lgsvl.AgentState()
         egoState.transform = sim.map_point_on_lane(self.initEvPos)
-        ego = sim.add_agent("XE_Rigged-apollo_3_5", lgsvl.AgentType.EGO, egoState)
+        ego = sim.add_agent(lgsvl.wise.DefaultAssets.ego_lincoln2017mkz_apollo5, lgsvl.AgentType.EGO, egoState)
         sensors = ego.get_sensors()
         for s in sensors:
             if s.name in ['velodyne', 'Main Camera', 'Telephoto Camera', 'GPS', 'IMU']:
                 s.enabled = True
         self.ego = ego
+        print("EV Created")
 
     def connectEvToApollo(self):
         ego = self.ego
         print("Connecting to bridge")
-        ego.connect_bridge(os.environ.get("BRIDGE_HOST", "127.0.0.1"), 9090)
+        ego.connect_bridge(env.str("LGSVL__AUTOPILOT_0_HOST", lgsvl.wise.SimulatorSettings.bridge_host), env.int("LGSVL__AUTOPILOT_0_PORT", lgsvl.wise.SimulatorSettings.bridge_port))
         while not ego.bridge_connected:
             time.sleep(1)
         print("Bridge connected")
@@ -176,12 +185,14 @@ class LgApSimulation:
 
         # Add NPCs: Hard code for now, the number of npc need to be consistent.
         ################################################################
-        self.addNpcVehicle(lgsvl.Vector(170, 10, 8.1), "Sedan")
-        self.addNpcVehicle(lgsvl.Vector(155, 10, 4.1),"SUV")
-        self.addFixedMovingNpc(lgsvl.Vector(5, 10, -4), "Sedan")
-        self.addFixedMovingNpc(lgsvl.Vector(25, 15, 0), "SUV")
-        self.addFixedMovingNpc(lgsvl.Vector(35, 20, 0), "SUV")
-        self.addFixedMovingNpc(lgsvl.Vector(45, 30, 0), "Jeep")
+        # self.addNpcVehicle(lgsvl.Vector(170, 10, 8.1), "Sedan")
+        # self.addNpcVehicle(lgsvl.Vector(155, 10, 4.1),"SUV")
+        self.addNpcVehicle(lgsvl.Vector(-40, 10, -13), "Sedan")
+        self.addNpcVehicle(lgsvl.Vector(-50, 10, -13),"SUV")
+        #self.addFixedMovingNpc(lgsvl.Vector(5, 10, -4), "Sedan")
+        #self.addFixedMovingNpc(lgsvl.Vector(25, 15, 0), "SUV")
+        #self.addFixedMovingNpc(lgsvl.Vector(35, 20, 0), "SUV")
+        #self.addFixedMovingNpc(lgsvl.Vector(45, 30, 0), "Jeep")
         ################################################################
 
         for npc in npcList:
@@ -202,7 +213,7 @@ class LgApSimulation:
 
             apollo = agent1
             npcVehicle = agent2
-            if agent2.name == "XE_Rigged-apollo_3_5":
+            if agent2.name == '47b529db-0593-4908-b3e7-4b24a32a0f70': # uid of the Lincoln MKZ
             	apollo = agent2
             	npcVehicle = agent1
             util.print_debug(" --- On Collision, ego speed: " + str(apollo.state.speed) + ", NPC speed: " + str(npcVehicle.state.speed))
@@ -277,7 +288,8 @@ class LgApSimulation:
                 for line in fbrLines:
                     pass
             
-                while not ego.bridge_connected or "fail" in line or "Fail" in line or "overflow" in line:
+                while not ego.bridge_connected: 
+                # or "fail" in line or "Fail" in line or "overflow" in line:
                     time.sleep(5)
                     resultDic = {}
                     resultDic['fitness'] = ''
@@ -310,16 +322,25 @@ class LgApSimulation:
 
 ##################################### MAIN ###################################
 # Read scenario obj 
+print('Running simulation')
 objPath = sys.argv[1]
 resPath = sys.argv[2]
 
+# Opens a file to load something
 objF = open(objPath, 'rb')
 scenarioObj = pickle.load(objF)
+print(scenarioObj)
 objF.close()
 
+# Result dictionary
 resultDic = {}
+print(resultDic)
+
+# Run the simulation
 try:
+    print("Creating the sim object")
     sim = LgApSimulation()
+    print("sim")
     resultDic = sim.runSimulation(scenarioObj)
 except Exception as e:
     util.print_debug(e.message)
@@ -329,7 +350,7 @@ except Exception as e:
 # Send fitness score int object back to ge
 if os.path.isfile(resPath) == True:
     os.system("rm " + resPath)
-f_f = open(resPath, 'wb')
+f_f = open(resPath, 'wb') # f_f = fitness function, I think
 pickle.dump(resultDic, f_f)
 f_f.truncate() 
 f_f.close() 

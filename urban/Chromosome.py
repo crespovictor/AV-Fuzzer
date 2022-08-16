@@ -1,4 +1,3 @@
-
 import math
 import random
 import pprint
@@ -43,6 +42,7 @@ class Chromosome:
 
     def decoding(self):
         fitness_score = 0
+        util.print_debug("=== Starting decoding function ===")
 
         # Send scenario object to simulation script
         s_f = open('scenario.obj', 'wb')
@@ -62,13 +62,14 @@ class Chromosome:
             if os.path.isfile('result.obj') == True:
                 f_f = open('result.obj', 'rb')
                 resultObj = pickle.load(f_f)
+                print(resultObj)
                 f_f.close()
 
             if resultObj != None and resultObj['fitness'] != '':
                 return resultObj
                 break
             else:
-                util.print_debug(" ***** " + str(x) + "th/10 trial: Fail to get fitness, try again ***** ")
+                util.print_debug(" ***** " + str(x) + "th/100 trial: Fail to get fitness, try again ***** ")
 
         return None
 
@@ -95,6 +96,6 @@ class Chromosome:
             
 if __name__ == '__main__':
     a = [[10, 30], [0, 2]]
-    chromosome = Chromosome(a, 5, 10, 10)
-    pprint.pprint(chromosome.scene)
+    chromosome = Chromosome(a, 5, 10)
+    pprint.pprint(chromosome.scenario)
 
